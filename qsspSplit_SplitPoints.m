@@ -1,4 +1,4 @@
-function splits = qsspGeneratePositions(lonRange, latRange, lonStep, latStep, nsplit, varargin)
+function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, nsplit, varargin)
 %qsspGeneratePositions Generate positions for qssp, in (lat, lon) degrees
 %   Input arguments:
 %      - lonRange : [lonMin, lonMax], 2 element vector, [deg]
