@@ -138,9 +138,6 @@ numLon = numel(Lon);
 numLat = numel(Lat);
 numPoints = numLon * numLat;
 disp(['Total number of points: ', num2str(numPoints)]);
-if numPoints>301 % max number of points in standard qsspstatic
-    disp('Warning: standard qsspstatic allows for a maximum of 301 points');
-end
 if numPoints>1e12 % max number of 'station id' characters is 12 (unlikely)
     disp('Warning: qsspsatic allows for max 12 char long station IDs');
     disp('         Therefore, using a sequential integer as station ID,');
@@ -163,6 +160,12 @@ if isempty(nsplit) % empy nsplit = no splitting (i.e. one split)
 else
     number_of_splits = ceil(numPoints / nsplit);
 end
+
+if nsplit>301 % max number of points in standard qsspstatic
+    disp('Warning: standard qsspstatic allows for a maximum of 301 points');
+    disp(['         ', num2str(nsplit), ' points-per-split are being requested']);
+end
+
 splits = cell(1, number_of_splits);
 for n=1:(number_of_splits - 1)
     splits{n} = LatLon(nsplit * (n-1) + 1 : nsplit * n, :);
@@ -172,7 +175,11 @@ splits{number_of_splits} = LatLon(nsplit * (number_of_splits-1) + 1 : end, :);
 intFmt = '%03d'; % format string for integers
 % to do: adequate number of leading zeros with digits of number_of_splits
 
+disp(['Number of splits: ', num2str(number_of_splits, '%d')])
+
 if ~isempty(outFilename) && ~PrependAppendFlag
+    % no input files to prepend and append provided
+    % simply output the plaintext lat, lon pairs (using qsspstatic inp indentation)
     for n=1:number_of_splits
         outFilename_seq = [outFilename, '_', num2str(n, intFmt)];
         fprintf(['[', num2str(n, intFmt), '/', num2str(number_of_splits,intFmt), '] Writing out to ', outFilename_seq])
@@ -187,6 +194,7 @@ if ~isempty(outFilename) && ~PrependAppendFlag
         disp(' done.')
     end
 elseif ~isempty(outFilename) && PrependAppendFlag
+    % input files to prepend and append were provided, use them
     toBeAppended = fileread(appendFilename);
     for n=1:number_of_splits
         outFilename_seq = [outFilename, '_split_', num2str(n, intFmt) , '.inp'];
@@ -195,18 +203,42 @@ elseif ~isempty(outFilename) && PrependAppendFlag
         fid=fopen(outFilename_seq, 'at'); % append, t option: CR LF endline (DOS)
         % write preamble, with output files for qssp
         fprintf(fid, '\n  1    0.0  0.0\n'); % NEEDS to start with a newline
-        fprintf(fid, '  0               0           0       0          0\n'); % set to OFF
+        % timeseries on/off flag (spacing as in original template)
+        fprintf(fid, [...
+            '  ', num2str(noTimeSeries),...
+            '               ', num2str(noTimeSeries),...
+            '           ', num2str(noTimeSeries),...
+            '       ', num2str(noTimeSeries),...
+            '          ', num2str(noTimeSeries), '\n']);
+        % timeseries filenames (may be used or not, according to 'noTimeSeries')
+        % note: escaping of quotes, this: "''' '''" becomes "' '"
+        %       (double quotes excluded, uses as delimiters in this example)
         fprintf(fid, ...
             [...
-                '  ''displacement_',intFmt,...
-                '''  ''vstrain_',intFmt,...
-                '''  ''tilt_',intFmt,...
-                '''  ''gravity_',intFmt,...
-                '''  ''geoid_',intFmt,'''\n'], ...
+                '  ', filePrefix, 'displacement_', intFmt,...
+                '''  ''', filePrefix, 'vstrain_', intFmt,...
+                '''  ''', filePrefix, 'tilt_', intFmt,...
+                '''  ''', filePrefix, 'gravity_', intFmt,...
+                '''  ''', filePrefix, 'geoid_', intFmt, '''\n'], ...
             n, n, n, n, n);
-        fprintf(fid, '  1\n');
-        fprintf(fid, ['     0.0    ''snap_coseis_',intFmt,'.dat''\n'], n);
-        fprintf(fid, '\n');
+        % snapshots: only coseismic or custom snapshot are provided
+        if ~customSnapshotsFlag
+            fprintf(fid, '  1\n'); % number of snapshots
+            fprintf(fid, ['     0.0    ', filePrefix, 'snap_coseis_', intFmt, '.dat', '\n'], n);
+            fprintf(fid, '\n');
+        else
+            snapshot_number = size(customSnapshots, 1);
+            fprintf(fid, ['  ', num2str(snapshot_number),'\n']); % number of snapshots
+            % customSnapshots: snapshots along rows (first dimension)
+            % along columns: first is numberf of days, second is label
+            for snapshot_n=1:snapshot_number
+                fprintf(fid, [...
+                    '     ', num2str(customSnapshots{snapshot_n, 1}),...
+                    '    ', filePrefix, 'snap_', customSnapshots{snapshot_n, 2},...
+                    '_', intFmt, '.dat', '\n'], n);
+            end
+            fprintf(fid, '\n');
+        end
         % write number of points (indentation: 2 spaces)
         fprintf(fid, '  %i\n', size(splits{n}, 1));
         % write lat, lon pairs (indentation: 4 spaces)
@@ -219,11 +251,15 @@ elseif ~isempty(outFilename) && PrependAppendFlag
         disp(' done.')
     end
     % print script with required commands (in serie with ';', alternative is '&' parallel)
-    fid=fopen([outFilename, '_launch.sh'], 'wt');
+    fid=fopen([outFilename, '_launch.sh'], 'w');
     for n=1:number_of_splits
-        fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem; \n']);
+        fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem;\n']);
     end
     fclose(fid);
+else
+    % 'outFilename' not provided, do not write output to file
+    % will return 'splits' as output argument (if requested)
+    disp('No output filename provided, therefore nothing to write external files.')
 end
 
 end
