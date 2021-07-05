@@ -8,7 +8,7 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %      - nsplit : how many maximum points in each split? (can be empty, results in no splitting)
 %      - optional: outFilename, where to write (lat, lon, ID) rows for qssp
 %                  it begins with a header line with the total number of points
-%                  it includes a sequantial 'split number'
+%                  it includes a sequential 'split number'.
 %      - optional (two arguments to be provided together)
 %                  - prependFilename
 %                  - appendFilename
