@@ -16,13 +16,19 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %       and after the points, with the following structure
 %       [prepended file, stop after the 'output parameters' comments
 %       "  1    0.0  0.0"
-%       "  1               1           1       1          1" (may be set to 0)
+%       "  1               1           1       1          1" (may be set to 0 by 'noTimeSeries' optional argument)
 %       "  'displacement_[SPLIT NUMBER]'  'vstrain_[SPLIT NUMBER]'  'tilt_[SPLIT NUMBER]'  'gravity_[SPLIT NUMBER]'  'geoid_[SPLIT NUMBER]'"
 %       "  1" (number of output snapshots)
 %       "     0.0    'snap_coseis_[SPLIT NUMBER].dat'"
 %       ""
 %       "  [number of receiver points here]"
 %       "    [lat  lon  ID of each point in split]"
+%      - optional: no time series option (only snapshot)
+%      - optional: custom snapshots, provided as a cell array
+%                  with snapshots along 1st dimension (rows)
+%                  1st column is time in days
+%                  2nd column is a label, will be placed in filename
+%      - optional: prefix for time series and snapshot files
 %       
 %       NOTE: the 'prepend' part should have the 'calculate green functions'
 %             switch turned off! (important for concurrent istances)
@@ -36,17 +42,17 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %
 %       NOTE: due to issues with CR/LF vs LF endline character
 %             save appendFilename as a Unix-type endline (LF only)
-%             (this is probably a trivial issue to fix, but won't do now)
+%             (this is probably a trivial issue to fix)
 %
 %   Output arguments:
 %      - LatLon: cell array, each element an array with a (lat, lon) couple each row
 %
-% 2021-01-27, 2021-02-19 AP
+% 2021-01-27, 2021-02-19, 2021-07-05 AP
 
-narginchk(5,8)
+narginchk(5,11)
 nargoutchk(0,1)
 
-if nargin>5 % optional output to filename
+if nargin>5 && ~isempty(varargin{1}) % optional output to filename
     outFilename = varargin{1};
     assert(ischar(outFilename) || isstring(outFilename),...
         'output filename must be type char or string');
@@ -55,7 +61,7 @@ else
 end
 
 if nargin>6 % part of inp file to prepend and append
-    assert(nargin==8)
+    assert(nargin>=8)
     PrependAppendFlag = true;
     prependFilename = varargin{2};
     appendFilename = varargin{3};
@@ -67,6 +73,48 @@ if nargin>6 % part of inp file to prepend and append
     assert(logical(exist(appendFilename, 'file')))
 else
     PrependAppendFlag = false;
+end
+
+% 'noTimeSeries', no-time-series option
+% if we are only interested in snapshots
+if nargin>8 && ~isempty(varargin{4})
+    noTimeSeries = logical(varargin{4});
+else
+    noTimeSeries = false;
+end
+
+% optional: instead of coseismic snapshot only
+% provide days and name of the requested snapshots (as a cell array)
+% e.g. to get this:
+%   6
+%     -1.0    'snap_final_[SPLIT NUMBER].dat'
+% 	 0.0    'snap_coseis_[SPLIT NUMBER].dat'
+% 	 30.0   'snap_1month_[SPLIT NUMBER].dat'
+% 	 60.0   'snap_2month_[SPLIT NUMBER].dat'
+% 	 365.0  'snap_1year_[SPLIT NUMBER].dat'
+% 	 730.0  'snap_2year_[SPLIT NUMBER].dat'
+% provide this:
+% {...
+%     -1, 'final';...
+%     0, 'coseis';...
+%     30, '1month';...
+%     60, '2month';...
+%     365, '1year';...
+%     730, '2year'}
+if nargin>9 && ~isempty(varargin{5})
+    assert(iscell(varargin{5}),'customSnapshots must be provided as type cell');
+    customSnapshots = varargin{5};
+    customSnapshotsFlag = true;
+else
+    customSnapshotsFlag = false;
+end
+
+if nargin>10 && ~isempty(varargin{6})
+    assert(ischar(varargin{6}) || isstring(varargin{6}),...
+        'filePrefix must be type char or string');
+    filePrefix = varargin{6};
+else
+    filePrefix = '';
 end
 
 assert(length(lonRange(:))==2)
