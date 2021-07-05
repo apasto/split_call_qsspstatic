@@ -31,8 +31,9 @@ else
 end
 
 %% read all files matching pattern
-SnapshotList = ls([ReadPath, filename_prefix, '*.DAT']);
-SnapshotCount = size(SnapshotList,1); % number of files
+SnapshotList = struct2cell(dir([ReadPath, filename_prefix, '*.dat']));
+SnapshotList = SnapshotList(1, :); % names only
+SnapshotCount = size(SnapshotList, 2); % number of files
 SnapshotCount_digits = ceil(log10(SnapshotCount))+1; % digits of SnapshotCount
 SnapshotCount_fmt = ['%0',num2str(SnapshotCount_digits,'%i'),'i']; % format string for num2str
 SnapshotCount_str = num2str(SnapshotCount,SnapshotCount_fmt);
@@ -42,11 +43,11 @@ Snapshot_in = cell(1,SnapshotCount);
 for n=1:SnapshotCount
     fprintf([...
         'Reading file ',...
-        num2str(n,SnapshotCount_fmt),...
-        ' of ',SnapshotCount_str,...
-        ' : ',SnapshotList(n,:)]);
-    Snapshot_in{n} = QSSPsnapshot2table([ReadPath,SnapshotList(n,:)]);
-    fprintf([' done. (',num2str(size(Snapshot_in{n},1),'%04i'),' rows)\n']);
+        num2str(n, SnapshotCount_fmt),...
+        ' of ', SnapshotCount_str,...
+        ' : ', char(SnapshotList(1, n))]);
+    Snapshot_in{n} = QSSPsnapshot2table([ReadPath, char(SnapshotList(1, n))]);
+    fprintf([' done. (', num2str(size(Snapshot_in{n}, 1),'%04i'), ' rows)\n']);
 end
 
 %% concatenate snapshots
