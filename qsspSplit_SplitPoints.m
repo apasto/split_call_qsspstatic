@@ -197,10 +197,14 @@ splits = cell(1, number_of_splits);
 for n=1:(number_of_splits - 1)
     splits{n} = LatLon(nsplit * (n-1) + 1 : nsplit * n, :);
 end
+% last split: fill with remainder of points (<= nsplit)
 splits{number_of_splits} = LatLon(nsplit * (number_of_splits-1) + 1 : end, :);
 
-intFmt = '%03d'; % format string for integers
-% to do: adequate number of leading zeros with digits of number_of_splits
+% format string for integers
+% according to number of digits in number_of_splits, with leading zeros
+number_of_splits_digits = ceil(log10(number_of_splits))+1;
+% e.g. 200 splits -> intFmt is '%03d' -> 001, 002, ..., 200
+intFmt = ['%0', num2str(number_of_splits_digits, '%d'), 'd'];
 
 disp(['Number of splits: ', num2str(number_of_splits, '%d')])
 
