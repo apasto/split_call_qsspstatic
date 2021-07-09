@@ -114,10 +114,9 @@ end
 %     730, '2year'}
 if nargin>9 && ~isempty(varargin{5})
     assert(iscell(varargin{5}),'customSnapshots must be provided as type cell');
-    customSnapshots = varargin{5};
-    customSnapshotsFlag = true;
+    definedSnapshots = varargin{5};
 else
-    customSnapshotsFlag = false;
+    definedSnapshots = {0, 'coseis'};
 end
 
 % prefix of output files (those defined in the inp files)
@@ -211,7 +210,7 @@ if ~isempty(outFilename) && ~PrependAppendFlag
     for n=1:number_of_splits
         outFilename_seq = [outFilename, '_', num2str(n, intFmt)];
         fprintf(['[', num2str(n, intFmt), '/', num2str(number_of_splits,intFmt), '] Writing out to ', outFilename_seq])
-        fid=fopen(outFilename_seq, 'wt'); % t option: CR LF endline (DOS)
+        fid=fopen(outFilename_seq, 'w');
         % write number of points (indentation: 2 spaces)
         fprintf(fid, '  %i\n', size(splits{n}, 1));
         % write lat, lon pairs (indentation: 4 spaces)
@@ -228,7 +227,7 @@ elseif ~isempty(outFilename) && PrependAppendFlag
         outFilename_seq = [outFilename, '_split_', num2str(n, intFmt) , '.inp'];
         copyfile(prependFilename, outFilename_seq); % copy part to be prepended
         fprintf(['[', num2str(n, intFmt), '/', num2str(number_of_splits, intFmt), '] Writing out to ', outFilename_seq])
-        fid=fopen(outFilename_seq, 'at'); % append, t option: CR LF endline (DOS)
+        fid=fopen(outFilename_seq, 'a'); % append
         % write preamble, with output files for qssp
         fprintf(fid, '\n  1    0.0  0.0\n'); % NEEDS to start with a newline
         % timeseries on/off flag (spacing as in original template)
@@ -249,24 +248,19 @@ elseif ~isempty(outFilename) && PrependAppendFlag
                 '''  ''', filePrefix, 'gravity_', intFmt,...
                 '''  ''', filePrefix, 'geoid_', intFmt, '''\n'], ...
             n, n, n, n, n);
-        % snapshots: only coseismic or custom snapshot are provided
-        if ~customSnapshotsFlag
-            fprintf(fid, '  1\n'); % number of snapshots
-            fprintf(fid, ['     0.0    ', filePrefix, 'snap_coseis_', intFmt, '.dat', '\n'], n);
-            fprintf(fid, '\n');
-        else
-            snapshot_number = size(customSnapshots, 1);
-            fprintf(fid, ['  ', num2str(snapshot_number),'\n']); % number of snapshots
-            % customSnapshots: snapshots along rows (first dimension)
-            % along columns: first is numberf of days, second is label
-            for snapshot_n=1:snapshot_number
-                fprintf(fid, [...
-                    '     ', num2str(customSnapshots{snapshot_n, 1}),...
-                    '    ', filePrefix, 'snap_', customSnapshots{snapshot_n, 2},...
-                    '_', intFmt, '.dat', '\n'], n);
-            end
-            fprintf(fid, '\n');
+        % snapshots definitions
+        snapshot_number = size(definedSnapshots, 1);
+        fprintf(fid, ['  ', num2str(snapshot_number),'\n']); % number of snapshots
+        % definedSnapshots: snapshots along rows (first dimension)
+        %                   columns: first is numberf of days,
+        %                            second is label
+        for snapshot_n=1:snapshot_number
+            fprintf(fid, [...
+                '     ', num2str(definedSnapshots{snapshot_n, 1}),...
+                '    ', filePrefix, 'snap_', definedSnapshots{snapshot_n, 2},...
+                '_', intFmt, '.dat', '\n'], n);
         end
+        fprintf(fid, '\n');
         % write number of points (indentation: 2 spaces)
         fprintf(fid, '  %i\n', size(splits{n}, 1));
         % write lat, lon pairs (indentation: 4 spaces)
