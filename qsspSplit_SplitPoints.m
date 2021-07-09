@@ -1,4 +1,4 @@
-function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, nsplit, varargin)
+function varargout = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, nsplit, varargin)
 %qsspGeneratePositions Generate positions for qssp, in (lat, lon) degrees
 %   Input arguments:
 %      - lonRange : [lonMin, lonMax], 2 element vector, [deg]
@@ -307,6 +307,10 @@ else
     % 'outFilename' not provided, do not write output to file
     % will return 'splits' as output argument (if requested)
     disp('No output filename provided, therefore nothing to write external files.')
+end
+
+if nargout==1
+    varargout{1} = split; % return LatLon to output argument, if called with one
 end
 
 end
