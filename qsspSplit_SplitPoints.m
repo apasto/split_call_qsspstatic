@@ -29,7 +29,17 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %                  1st column is time in days
 %                  2nd column is a label, will be placed in filename
 %      - optional: prefix for time series and snapshot files
-%      - optional: flag, write call script for concurrent (parallel) calls
+%      - optional: doParallelCalls flag
+%                  true:   prepare a call script for gnu parallel,
+%                          in the form:
+%                          "ls ${filePrefix}_split_*.inp | parallel --verbose echo {1} '|' ${qsspbin}"
+%                  false:  prepare a call script with
+%                          semicolon-separated serial calls
+%      - optional: qsspbin, binary of qsspstatic to be called
+%                  e.g. if we have more than one version
+%                  such as one re-compiled with different options
+%                  for a larger number of receiver points
+%                  defaults to 'qsspstatic'
 %       
 %       NOTE: the 'prepend' part should have the 'calculate green functions'
 %             switch turned off! (important for concurrent istances)
@@ -50,7 +60,7 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %
 % 2021-01-27, 2021-02-19, 2021-07-05 AP
 
-narginchk(5,12)
+narginchk(5,13)
 nargoutchk(0,1)
 
 if nargin>5 && ~isempty(varargin{1}) % optional output to filename
@@ -119,18 +129,20 @@ else
     filePrefix = '';
 end
 
-% serial (;) or parallel (&) calls in call script
-% to do: from ampersand (&) to proper gnu parallel or alternative
 if nargin>10 && ~isempty(varargin{7})
     doParallelCalls = logical(varargin{7});
 else
     doParallelCalls = false;
 end
-% select the shell script separator between calls accordingly
-if doParallelCalls
-    callSeparator = '&';
+
+% qssbin: which binary to call in the call script
+% to do: from ampersand (&) to proper gnu parallel or alternative
+if nargin>11 && ~isempty(varargin{8})
+    assert(ischar(varargin{8}) || isstring(varargin{8}),...
+        'qssbin must be type char or string');
+    qsspbin = varargin{8};
 else
-    callSeparator = ';';
+    qsspbin = 'qsspstatic';
 end
 
 assert(length(lonRange(:))==2)
@@ -266,15 +278,21 @@ elseif ~isempty(outFilename) && PrependAppendFlag
         fclose(fid);
         disp(' done.')
     end
-    % print script with required commands (in serie with ';', alternative is '&' parallel)
+    % print script with required commands
+    % (serial, list of calls separeted with ';',
+    %  or call to gnu parallel, with pattern)
     fid=fopen([outFilename, '_launch.sh'], 'w');
-    for n=1:number_of_splits
-        fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem', callSeparator, '\n']);
+    if ~doParallelCalls % serial
+        for n=1:number_of_splits
+            fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem', ';', '\n']);
+        end
+        fprintf(fid, 'echo "ALL DONE!"\n');
+    else % gnu parallel, match-pattern call
+        fprintf(fid, [...
+            'ls ', filePrefix, 'split_*.inp ',...
+            '| parallel --verbose echo {1} ',...
+            '''|'' ', qsspbin, '\n']);
     end
-    if doParallelCalls % 'wait' command after all '&'-separated calls
-        fprintf(fid, 'wait\n');
-    end
-    fprintf(fid, 'echo "ALL DONE!"\n');
     fclose(fid);
 else
     % 'outFilename' not provided, do not write output to file
