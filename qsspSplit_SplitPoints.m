@@ -29,6 +29,7 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %                  1st column is time in days
 %                  2nd column is a label, will be placed in filename
 %      - optional: prefix for time series and snapshot files
+%      - optional: flag, write call script for concurrent (parallel) calls
 %       
 %       NOTE: the 'prepend' part should have the 'calculate green functions'
 %             switch turned off! (important for concurrent istances)
@@ -49,7 +50,7 @@ function splits = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep, ns
 %
 % 2021-01-27, 2021-02-19, 2021-07-05 AP
 
-narginchk(5,11)
+narginchk(5,12)
 nargoutchk(0,1)
 
 if nargin>5 && ~isempty(varargin{1}) % optional output to filename
@@ -109,12 +110,27 @@ else
     customSnapshotsFlag = false;
 end
 
+% prefix of output files (those defined in the inp files)
 if nargin>10 && ~isempty(varargin{6})
     assert(ischar(varargin{6}) || isstring(varargin{6}),...
         'filePrefix must be type char or string');
     filePrefix = varargin{6};
 else
     filePrefix = '';
+end
+
+% serial (;) or parallel (&) calls in call script
+% to do: from ampersand (&) to proper gnu parallel or alternative
+if nargin>10 && ~isempty(varargin{7})
+    doParallelCalls = logical(varargin{7});
+else
+    doParallelCalls = false;
+end
+% select the shell script separator between calls accordingly
+if doParallelCalls
+    callSeparator = '&';
+else
+    callSeparator = ';';
 end
 
 assert(length(lonRange(:))==2)
@@ -253,8 +269,12 @@ elseif ~isempty(outFilename) && PrependAppendFlag
     % print script with required commands (in serie with ';', alternative is '&' parallel)
     fid=fopen([outFilename, '_launch.sh'], 'w');
     for n=1:number_of_splits
-        fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem;\n']);
+        fprintf(fid, ['printf "', [outFilename, '_split_', num2str(n, intFmt) , '.inp'], '" | qsspstatic_bigmem', callSeparator, '\n']);
     end
+    if doParallelCalls % 'wait' command after all '&'-separated calls
+        fprintf(fid, 'wait\n');
+    end
+    fprintf(fid, 'echo "ALL DONE!"\n');
     fclose(fid);
 else
     % 'outFilename' not provided, do not write output to file
