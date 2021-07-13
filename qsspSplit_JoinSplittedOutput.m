@@ -22,7 +22,7 @@ narginchk(1,2)
 
 % optional argument: filename prefix (before sequential numbers)
 % also defines output filename: [filename_prefix, 'all.mat']
-if nargin==2
+if nargin>=2
     filename_prefix = varargin{1};
     assert(ischar(filename_prefix) || isstring(filename_prefix),...
         'filename prefix must be type char or string');
@@ -65,5 +65,13 @@ save(OutFilename, 'Snapshot_all');
 disp(['Joined data saved in: ', OutFilename])
 disp(['   Total receivers: ', num2str(size(Snapshot_all, 1), '%i')])
 disp('Call to qsspSplit_JoinSplittedOutput done.');
+
+%% save status file: join was performed
+% as a flag to allow removal of splitted outputs
+OutStatusFilename = [ReadPath, 'JoinStatus_', filename_prefix, 'all'];
+fid=fopen(OutStatusFilename, 'w');
+fprintf(fid, ['Join performed on', datestr(datetime('now'), 'yyyy-mm-dd HH:MM:SS'), '\n']);
+fprintf(fid, ['Joined data saved in: ', OutFilename, '\n']);
+fclose(fid);
 
 end
