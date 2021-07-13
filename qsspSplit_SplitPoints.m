@@ -80,8 +80,10 @@ if nargin>6 % part of inp file to prepend and append
         'prepend filename must be type char or string');
     assert(ischar(appendFilename) || isstring(appendFilename),...
         'append filename must be type char or string');
-    assert(logical(exist(prependFilename, 'file')))
-    assert(logical(exist(appendFilename, 'file')))
+    assert(logical(exist(prependFilename, 'file')),...
+        [prependFilename, ' does not exist or is not a file'])
+    assert(logical(exist(appendFilename, 'file')),...
+        [appendFilename, ' does not exist or is not a file'])
 else
     PrependAppendFlag = false;
 end
