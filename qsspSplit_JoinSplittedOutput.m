@@ -51,7 +51,6 @@ for n=1:SnapshotCount
 end
 
 %% concatenate snapshots
-
 fprintf(['Concatenating ',num2str(SnapshotCount, '%i'), ' files... '])
 Snapshot_all = Snapshot_in{1}; % first table
 for n=2:size(Snapshot_in, 2) % concatenate one-by-one the other tables
