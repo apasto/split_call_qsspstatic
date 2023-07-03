@@ -69,7 +69,7 @@ disp('Call to qsspSplit_JoinSplittedOutput done.');
 % as a flag to allow removal of splitted outputs
 OutStatusFilename = [ReadPath, 'JoinStatus_', filename_prefix, 'all'];
 fid=fopen(OutStatusFilename, 'w');
-fprintf(fid, ['Join performed on', datestr(datetime('now'), 'yyyy-mm-dd HH:MM:SS'), '\n']);
+fprintf(fid, ['Join performed on', char(datetime('now'), 'yyyy-mm-dd HH:MM:SS'), '\n']);
 fprintf(fid, ['Joined data saved in: ', OutFilename, '\n']);
 fclose(fid);
 
