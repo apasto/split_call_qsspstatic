@@ -2,7 +2,11 @@ function varargout = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep,
 %qsspGeneratePositions Generate positions for qssp, in (lat, lon) degrees
 %   Input arguments:
 %      - lonRange : [lonMin, lonMax], 2 element vector, [deg]
+%                   if optional argument sparse_points_flag is true
+%                   this is interpreted instead as a vector of spare points longitudes
 %      - latRange : [latMin, latMax], 2 element vector, [deg]
+%                   if optional argument sparse_points_flag is true
+%                   this is interpreted instead as a vector of spare points latitudes
 %      - lonStep : interval between samples along longitude, [deg]
 %      - latStep : interval between samples along latitude, [deg]
 %      - nsplit : how many maximum points in each split? (can be empty, results in no splitting)
@@ -41,7 +45,13 @@ function varargout = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep,
 %                  for a larger number of receiver points
 %                  defaults to 'qsspstatic'
 %      - optional: create join script (defaul: true)
-%                  set to off for GF computation calls
+%                  set to false for GF computation calls
+%      - optional: provide sparse points instead of grids
+%                  (note that this requires different post-processing,
+%                  with no reliance on calls to gmt xyz2grd)
+%                  If this this (sparse_points_flag) is set to true,
+%                  lonRange and latRange are interpreted as two
+%                  same-length vectors defining the sparse points
 %       
 %       NOTE: the 'prepend' part should have the 'calculate green functions'
 %             switch turned off! (important for concurrent istances)
@@ -60,9 +70,9 @@ function varargout = qsspSplit_SplitPoints(lonRange, latRange, lonStep, latStep,
 %   Output arguments:
 %      - LatLon: cell array, each element an array with a (lat, lon) couple each row
 %
-% 2021-01-27, 2021-02-19, 2021-07-05 AP
+% 2021-01-27, 2021-02-19, 2021-07-05, 2023-07-03 AP
 
-narginchk(5,14)
+narginchk(5,15)
 nargoutchk(0,1)
 
 if nargin>5 && ~isempty(varargin{1}) % optional output to filename
@@ -116,6 +126,8 @@ end
 %     60, '2month';...
 %     365, '1year';...
 %     730, '2year'}
+% a 'snapshot_names' function is provided
+% to turn a vector of days in a cell array of 'day, name' rows
 if nargin>9 && ~isempty(varargin{5})
     assert(iscell(varargin{5}),'customSnapshots must be provided as type cell');
     definedSnapshots = varargin{5};
@@ -157,26 +169,35 @@ else
     create_join_script = true;
 end
 
-assert(length(lonRange(:))==2)
-assert(length(latRange(:))==2)
-assert(lonRange(2) - lonRange(1)>=0)
-assert(latRange(2) - latRange(1)>=0)
-assert(isscalar(lonStep))
-assert(isscalar(latStep))
+if nargin>14 && ~isempty(varargin{10})
+    sparse_points_flag = logical(varargin{10});
+else
+    sparse_points_flag = false;
+end
 
-% vectors of sampled longitudes and latitudes
-Lon = lonRange(1):lonStep:lonRange(2);
-Lat = latRange(1):lonStep:latRange(2);
+if ~sparse_points_flag
+    assert(length(lonRange(:))==2)
+    assert(length(latRange(:))==2)
+    assert(lonRange(2) - lonRange(1)>=0)
+    assert(latRange(2) - latRange(1)>=0)
+    assert(isscalar(lonStep))
+    assert(isscalar(latStep))
+    % vectors of sampled longitudes and latitudes
+    Lon = lonRange(1):lonStep:lonRange(2);
+    Lat = latRange(1):lonStep:latRange(2);
+    % print actual lon and lat range
+    % ('stop' lon and lat may not be reached with imposed step,
+    %  but regular grid structure is more important than range coverage)
+    disp(['Actual lon range : min=', num2str(Lon(1)), '°, max=', num2str(Lon(end)), '°']);
+    disp(['Actual lat range : min=', num2str(Lat(1)), '°, max=', num2str(Lat(end)), '°']);
+    numLon = numel(Lon);
+    numLat = numel(Lat);
+    numPoints = numLon * numLat;
+else
+    assert(length(lonRange) == length(latRange))
+    numPoints = length(lonRange);
+end
 
-% print actual lon and lat range
-% ('stop' lon and lat may not be reached with imposed step,
-%  but regular grid structure is more important than range coverage)
-disp(['Actual lon range : min=', num2str(Lon(1)), '°, max=', num2str(Lon(end)), '°']);
-disp(['Actual lat range : min=', num2str(Lat(1)), '°, max=', num2str(Lat(end)), '°']);
-
-numLon = numel(Lon);
-numLat = numel(Lat);
-numPoints = numLon * numLat;
 disp(['Total number of points: ', num2str(numPoints)]);
 if numPoints>1e12 % max number of 'station id' characters is 12 (unlikely)
     disp('Warning: qsspsatic allows for max 12 char long station IDs');
@@ -185,11 +206,18 @@ if numPoints>1e12 % max number of 'station id' characters is 12 (unlikely)
     disp('Possibile solution, not yet implemented: use alphanumeric ID.');
 end
 
-% create meshgrids with all the (lat, lon) points defined by Lon and Lat
-[latMesh, lonMesh] = meshgrid(Lat, Lon);
-
-% numPoints by 2 array of (lat, lon) couples
-LatLon = [latMesh(:), lonMesh(:)];
+if ~sparse_points_flag
+    % create meshgrids with all the (lat, lon) points defined by Lon and Lat
+    [latMesh, lonMesh] = meshgrid(Lat, Lon);
+    % perform -180/180 wrap of longitude
+    lonMesh = wrapTo180(lonMesh);
+    % TODO: wrap latitude, if below/above -90/+90 (less trivial than longitude)
+    % numPoints by 2 array of (lat, lon) couples
+    LatLon = [latMesh(:), lonMesh(:)];
+else
+    lonRange = wrapTo180(lonRange);
+    LatLon = [latRange(:), lonRange(:)];
+end
 
 strLonLatFormat = '%12.8f'; % fprintf format for conversion
 
@@ -273,9 +301,9 @@ elseif ~isempty(outFilename) && PrependAppendFlag
         %                            second is label
         for snapshot_n=1:snapshot_number
             fprintf(fid, [...
-                '     ', num2str(definedSnapshots{snapshot_n, 1}),...
-                '    ', filePrefix, 'snap_', definedSnapshots{snapshot_n, 2},...
-                '_', intFmt, '.dat', '\n'], n);
+                '     ', num2str(definedSnapshots{snapshot_n, 1}, '%f'),...
+                '    ''', filePrefix, 'snap_', definedSnapshots{snapshot_n, 2},...
+                '_', intFmt, '.dat''', '\n'], n);
         end
         fprintf(fid, '\n');
         % write number of points (indentation: 2 spaces)
